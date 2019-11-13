@@ -1,0 +1,43 @@
+#!/bin/bash
+#echo "Generating Data Using Teragen"
+#hadoop jar /usr/local/hadoop/share/hadoop/mapreduce/hadoop-mapreduce-examples-3.0.2.jar teragen 5242880 input500
+#dataSize=(500 750 1024 1536 2048 2560 3072 4096 4608 5120)
+#inumReducer=$((1 + RANDOM % 5))
+#echo $numReducer
+scaleProfile=(tiny small huge gigantic bigdata)
+#scaleProfile=(huge)
+for i in "${scaleProfile[@]}"
+do
+   sed -i.bak  s/"hibench.scale.profile.*"/"hibench.scale.profile     $i"/g conf/hibench.conf
+
+   sed -i.bak  s/"hibench.yarn.executor.num.*"/"hibench.yarn.executor.num     16"/g conf/spark.conf
+   sed -i.bak  s/"spark.executor.memory.*"/"spark.executor.memory     4g"/g conf/spark.conf
+   sed -i.bak  s/"hibench.yarn.executor.cores.*"/"hibench.yarn.executor.cores     4"/g conf/spark.conf
+   sed -i.bak  s/"spark.driver.memory.*"/"spark.driver.memory     4g"/g conf/spark.conf
+
+   echo Generatig Data Rows Using Teragen
+   bin/workloads/ml/bayes/prepare/prepare.sh
+   echo Data Generation Finished
+   numExecutor=(4 8 16)
+   for j in "${numExecutor[@]}"
+   do
+	 sed -i.bak  s/"hibench.yarn.executor.num.*"/"hibench.yarn.executor.num     $j"/g conf/spark.conf
+	 executorMem=(2 4)
+	 for k in "${executorMem[@]}"
+	 do
+            sed -i.bak  s/"spark.executor.memory.*"/"spark.executor.memory     $k"g/g conf/spark.conf
+            numCores=(2 4)
+	    for l in "${numCores[@]}"
+            do
+	      sed -i.bak  s/"hibench.yarn.executor.cores.*"/"hibench.yarn.executor.cores     $l"/g conf/spark.conf
+	      driverMem=(2 4)
+	      for m in "${driverMem[@]}"
+	      do
+		 echo Running benchmark with $i datasize numExe=$j exeMem=$k numCore=$l driverMem=$m Confirugration
+		 sed -i.bak  s/"spark.driver.memory.*"/"spark.driver.memory     $m"g/g conf/spark.conf
+		 bin/workloads/ml/bayes/spark/run.sh
+	      done
+	    done	    
+	 done
+   done
+done
